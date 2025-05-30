@@ -27,16 +27,71 @@ async function run() {
     // Send a ping to confirm a successful connection
 
     const coffeeCollection = client.db("coffeeDB").collection("coffee");
+    const userCollection = client.db("coffeeDB").collection("users");
+
+    app.post("/user/create", async (req, res) => {
+      const newUser = req.body;
+      console.log("creating new User", newUser);
+      const result = await userCollection.insertOne(newUser);
+      if (result.acknowledged) {
+        const insertedUser = await userCollection.findOne({
+          _id: result.insertedId,
+        });
+        res.send(insertedUser);
+      } else {
+        res.status(500).send({ message: "Failed to create user" });
+      }
+    });
+
+    app.get("/user/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const user = await userCollection.findOne(query);
+      if (user) {
+        res.send(user);
+      } else {
+        res.status(404).send({
+          message: "User not found",
+        });
+      }
+    });
+
+    app.get("/users", async (req, res) => {
+      const cursor = userCollection.find();
+      const result = await cursor.toArray();
+      if (result.length > 0) {
+        res.send(result);
+      } else {
+        res.status(404).send({
+          message: "No User Found",
+        });
+      }
+    });
+
+    app.delete("/user/delete/:id", async (req, res) => {
+      const id = req.params.id;
+      console.log("Deleting user with id:", id);
+      const query = {
+        _id: new ObjectId(id),
+      };
+      const result = await userCollection.deleteOne(query);
+      console.log("Delete result:", result);
+      if (result.deletedCount === 1) {
+        res.send({ message: "User deleted successfully", result: result });
+      } else {
+        res.status(404).send({ message: "User not found" });
+      }
+    });
 
     app.get("/", (req, res) => {
       res.send("Hello from the server!");
     });
 
-    app.get("/coffees",async(req,res)=>{
-        const cursor = coffeeCollection.find();
-        const result = await cursor.toArray();
-        res.send(result);
-    })
+    app.get("/coffees", async (req, res) => {
+      const cursor = coffeeCollection.find();
+      const result = await cursor.toArray();
+      res.send(result);
+    });
 
     app.post("/coffee/create", async (req, res) => {
       const newCoffee = req.body;
@@ -74,13 +129,19 @@ async function run() {
           photoUrl: updateCoffee.photoUrl,
         },
       };
-      const result = await coffeeCollection.updateOne(query,updateCoffeeData, options)
-        if (result.modifiedCount > 0) {
-            const updatedCoffee = await coffeeCollection.findOne(query);
-            res.send(updatedCoffee);
-        } else {
-            res.status(404).send({ message: "Coffee not found or no changes made" });
-        }
+      const result = await coffeeCollection.updateOne(
+        query,
+        updateCoffeeData,
+        options
+      );
+      if (result.modifiedCount > 0) {
+        const updatedCoffee = await coffeeCollection.findOne(query);
+        res.send(updatedCoffee);
+      } else {
+        res
+          .status(404)
+          .send({ message: "Coffee not found or no changes made" });
+      }
     });
 
     app.delete("/coffee/delete/:id", async (req, res) => {
